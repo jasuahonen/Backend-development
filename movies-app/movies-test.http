@@ -7,17 +7,19 @@ POST http://localhost:3010/movies
 Content-Type: application/json
 
 {
-    "title": "Interstellar",
-    "director": "Christopher Nolan",
-    "year": 2010
+    "title": "Apollo 13",
+    "director": "Ron Howard",
+    "year": 1995
 }
 
 ### Get a movie by ID
-GET http://localhost:3010/movies/1
+# Replace <id> with the MongoDB _id from your database
+GET http://localhost:3010/movies/674063d7b8d7c5d6174557ee
 Accept: application/json
 
 ### Update a movie
-PUT http://localhost:3010/movies/1
+# Replace <id> with the MongoDB _id from your database
+PUT http://localhost:3010/movies/<id>
 Content-Type: application/json
 
 {
@@ -27,7 +29,8 @@ Content-Type: application/json
 }
 
 ### Delete a movie
-DELETE http://localhost:3010/movies/1
+# Replace <id> with the MongoDB _id from your database
+DELETE http://localhost:3010/movies/<id>
 
 ### Filter movies by year
 GET http://localhost:3010/movies?year=1999

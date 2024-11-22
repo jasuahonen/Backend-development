@@ -1,5 +1,6 @@
 const express = require('express');
 const morgan = require('morgan');
+const { MongoClient, ObjectId, ServerApiVersion } = require('mongodb');
 
 const app = express();
 const PORT = 3010;
@@ -11,126 +12,127 @@ if (process.env.NODE_ENV === 'development') {
 
 app.use(express.json());
 
-const movies = [
-    { id: 1, title: "Inception", director: "Christopher Nolan", year: 2010 },
-    { id: 2, title: "The Matrix", director: "The Wachowskis", year: 1999 },
-    { id: 3, title: "Parasite", director: "Bong Joon-ho", year: 2019 }
-];
+// MongoDB Connection
+const uri = "mongodb+srv://jasuahonen:JasunMongoDatabase@cluster0.483oq.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0";
+const client = new MongoClient(uri, {
+    serverApi: {
+        version: ServerApiVersion.v1,
+        strict: true,
+        deprecationErrors: true,
+    }
+});
 
-// Helper function to validate movie data
-const validateMovie = (movie) => {
-    if (!movie.title || typeof movie.title !== 'string') {
-        return 'Invalid or missing title';
+let moviesCollection;
+
+async function connectToDB() {
+    try {
+        await client.connect();
+        console.log("Connected to MongoDB!");
+
+        const db = client.db('moviesDB'); // Replace 'movieDatabase' with your database name
+        moviesCollection = db.collection('movies'); // Replace 'movies' with your collection name
+    } catch (err) {
+        console.error('Error connecting to MongoDB:', err);
     }
-    if (!movie.director || typeof movie.director !== 'string') {
-        return 'Invalid or missing director';
-    }
-    if (!movie.year || typeof movie.year !== 'number' || movie.year < 1888 || movie.year > new Date().getFullYear()) {
-        return 'Invalid or missing year (movies should be from 1888 onwards)';
-    }
-    return null;
-};
+}
+
+connectToDB();
 
 // Default route: return all movies as HTML list
-app.get('/', (req, res) => {
-    let movieList = movies.map(movie => `<li>${movie.title} (${movie.year}) - Directed by ${movie.director}</li>`).join('');
-    res.send(`<h1>Movie Collection</h1><ul>${movieList}</ul>`);
+app.get('/', async (req, res) => {
+    try {
+        const movies = await moviesCollection.find().toArray();
+        const movieList = movies.map(movie => `<li>${movie.title} (${movie.year}) - Directed by ${movie.director}</li>`).join('');
+        res.send(`<h1>Movie Collection</h1><ul>${movieList}</ul>`);
+    } catch (err) {
+        res.status(500).send('Server Error');
+    }
 });
 
 // GET /movies - Return all movies with optional filtering
-app.get('/movies', (req, res) => {
+app.get('/movies', async (req, res) => {
     const { title, year, director } = req.query;
+    let query = {};
 
-    let filteredMovies = movies;
+    if (title) query.title = new RegExp(title, 'i'); // Case-insensitive search
+    if (year) query.year = parseInt(year, 10);
+    if (director) query.director = new RegExp(director, 'i'); // Case-insensitive search
 
-    // Filter by title if provided
-    if (title) {
-        filteredMovies = filteredMovies.filter(movie =>
-            movie.title.toLowerCase().includes(title.toLowerCase())
-        );
+    try {
+        const movies = await moviesCollection.find(query).toArray();
+        res.json(movies);
+    } catch (err) {
+        res.status(500).send('Server Error');
     }
-
-    // Filter by year if provided and is a valid number
-    if (year) {
-        const yearNum = parseInt(year, 10);
-        if (!isNaN(yearNum)) {
-            filteredMovies = filteredMovies.filter(movie => movie.year === yearNum);
-        } else {
-            return res.status(400).json({ error: 'Year must be a valid number' });
-        }
-    }
-
-    // Filter by director if provided
-    if (director) {
-        filteredMovies = filteredMovies.filter(movie =>
-            movie.director.toLowerCase().includes(director.toLowerCase())
-        );
-    }
-
-    res.json(filteredMovies);
 });
 
-
 // GET /movies/:id - Return a specific movie by its ID
-app.get('/movies/:id', (req, res) => {
-    const movieId = parseInt(req.params.id, 10);
-    const movie = movies.find(m => m.id === movieId);
-    if (movie) {
-        res.json(movie);
-    } else {
-        res.status(404).send('Movie not found');
+app.get('/movies/:id', async (req, res) => {
+    try {
+        const movie = await moviesCollection.findOne({ _id: new ObjectId(req.params.id) });
+        if (movie) {
+            res.json(movie);
+        } else {
+            res.status(404).send('Movie not found');
+        }
+    } catch (err) {
+        res.status(400).send('Invalid ID');
     }
 });
 
 // POST /movies - Create a new movie
-app.post('/movies', (req, res) => {
-    const error = validateMovie(req.body);
-    if (error) {
-        return res.status(400).json({ error }); // 400 Bad Request if data is invalid
+app.post('/movies', async (req, res) => {
+    const { title, director, year } = req.body;
+
+    if (!title || !director || !year || typeof year !== 'number') {
+        console.error('Validation failed:', req.body);
+        return res.status(400).json({ error: 'Invalid movie data' });
     }
 
-    const newMovie = { id: movies.length + 1, ...req.body };
-    movies.push(newMovie);
-    res.status(201).json(newMovie); // 201 Created for successful creation
+    try {
+        const newMovie = { title, director, year };
+        const result = await moviesCollection.insertOne(newMovie);
+
+        // Use insertedId instead of ops[0]
+        res.status(201).json({ ...newMovie, _id: result.insertedId });
+    } catch (err) {
+        console.error('Error inserting movie:', err);
+        res.status(500).json({ error: 'Failed to insert movie', details: err.message });
+    }
 });
 
+
 // PUT /movies/:id - Update an existing movie
-app.put('/movies/:id', (req, res) => {
-    const movieId = parseInt(req.params.id, 10);
-    const movieIndex = movies.findIndex(m => m.id === movieId);
-
-    if (movieIndex === -1) {
-        return res.status(404).send('Movie not found');
+app.put('/movies/:id', async (req, res) => {
+    try {
+        const result = await moviesCollection.findOneAndUpdate(
+            { _id: new ObjectId(req.params.id) },
+            { $set: req.body },
+            { returnDocument: 'after', upsert: false } // Return updated document
+        );
+        if (result.value) {
+            res.json(result.value);
+        } else {
+            res.status(404).send('Movie not found');
+        }
+    } catch (err) {
+        res.status(400).send('Invalid ID');
     }
-
-    const error = validateMovie(req.body);
-    if (error) {
-        return res.status(400).json({ error }); // 400 Bad Request if data is invalid
-    }
-
-    const updatedMovie = { id: movieId, ...req.body };
-    movies[movieIndex] = updatedMovie;
-    res.json(updatedMovie); // Return the updated movie
 });
 
 // DELETE /movies/:id - Delete a movie by its ID
-app.delete('/movies/:id', (req, res) => {
-    const movieId = parseInt(req.params.id, 10);
-    const movieIndex = movies.findIndex(m => m.id === movieId);
-
-    if (movieIndex === -1) {
-        return res.status(404).send('Movie not found');
+app.delete('/movies/:id', async (req, res) => {
+    try {
+        const result = await moviesCollection.deleteOne({ _id: new ObjectId(req.params.id) });
+        if (result.deletedCount === 1) {
+            res.sendStatus(204); // No Content
+        } else {
+            res.status(404).send('Movie not found');
+        }
+    } catch (err) {
+        res.status(400).send('Invalid ID');
     }
-
-    movies.splice(movieIndex, 1);
-    res.sendStatus(204); // 204 No Content for successful deletion
 });
-
-// Catch-all route for undefined endpoints
-app.use((req, res) => {
-    res.status(404).send('Route not found');
-});
-
 
 // Start the server
 app.listen(PORT, () => {
