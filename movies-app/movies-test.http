@@ -1,0 +1,38 @@
+### Get all movies
+GET http://localhost:3010/movies
+Accept: application/json
+
+### Add a new movie
+POST http://localhost:3010/movies
+Content-Type: application/json
+
+{
+    "title": "Interstellar",
+    "director": "Christopher Nolan",
+    "year": 2010
+}
+
+### Get a movie by ID
+GET http://localhost:3010/movies/1
+Accept: application/json
+
+### Update a movie
+PUT http://localhost:3010/movies/1
+Content-Type: application/json
+
+{
+    "title": "Inception",
+    "director": "Christopher Nolan",
+    "year": 2010
+}
+
+### Delete a movie
+DELETE http://localhost:3010/movies/1
+
+### Filter movies by year
+GET http://localhost:3010/movies?year=1999
+Accept: application/json
+
+### Combined filter by year and director
+GET http://localhost:3010/movies?year=2010&director=Christopher%20Nolan
+Accept: application/json
