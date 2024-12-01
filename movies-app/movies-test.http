@@ -1,9 +1,22 @@
+@token=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6IjY3NGNkY2NiNWRhMGYzZTA1Y2YwOTNhNiIsInJvbGUiOiJhZG1pbiIsImlhdCI6MTczMzA5MTAyMiwiZXhwIjoxNzMzMDk0NjIyfQ.H4XLUIJsSb-Zrp2IAx74MLaxi3hZqY1--sa7N0bzoAs
+### login user
+POST http://localhost:3010/auth/login
+Content-Type: application/json
+
+{
+    "username": "jasuahonen",
+    "password": "JasunMongoDatabase"
+}
+
+
+
 ### Get all movies
 GET http://localhost:3010/movies
 Accept: application/json
 
 ### Add a new movie
 POST http://localhost:3010/movies
+Authorization: Bearer {{token}}
 Content-Type: application/json
 
 {
@@ -20,6 +33,7 @@ Accept: application/json
 ### Update a movie
 # Replace <id> with the MongoDB _id from your database
 PUT http://localhost:3010/movies/<id>
+Authorization: Bearer {{token}}
 Content-Type: application/json
 
 {
@@ -31,6 +45,7 @@ Content-Type: application/json
 ### Delete a movie
 # Replace <id> with the MongoDB _id from your database
 DELETE http://localhost:3010/movies/<id>
+Authorization: Bearer {{token}}
 
 ### Filter movies by year
 GET http://localhost:3010/movies?year=1999
